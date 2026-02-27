@@ -1,0 +1,11 @@
+export default function AuthLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-purple-50 via-indigo-50 to-purple-100">
+      {children}
+    </div>
+  );
+}
