@@ -7,162 +7,250 @@ datasource db {
   provider = "sqlite"
 }
 
+// ====== USERS ======
 model User {
-  id            String         @id @default(cuid())
-  email         String         @unique
+  id            String    @id @default(cuid())
+  email         String    @unique
   name          String
   password      String
-  role          String         @default("creator")
+  role          String    @default("student") // "admin" | "student"
+  phone         String?
   avatarUrl     String?
-  bio           String?
-  courses       Course[]
-  enrollments   Enrollment[]
-  quizAttempts  QuizAttempt[]
-  certificates  Certificate[]
-  reviews       Review[]
-  notifications Notification[]
-  createdAt     DateTime       @default(now())
+  targetExam    String?   // exam slug the student is preparing for
+  examDate      DateTime? // target exam date
+  createdAt     DateTime  @default(now())
+
+  enrollments    Enrollment[]
+  testAttempts   TestAttempt[]
+  transactions   Transaction[]
+  studyProgress  StudyProgress[]
+  notifications  Notification[]
+  bookmarks      Bookmark[]
 }
 
-model Course {
-  id           String        @id @default(cuid())
-  title        String
-  slug         String        @unique
-  description  String
-  thumbnail    String?
-  category     String
-  level        String        @default("beginner")
-  status       String        @default("draft")
-  price        Float         @default(0)
-  creatorId    String
-  creator      User          @relation(fields: [creatorId], references: [id])
-  chapters     Chapter[]
-  enrollments  Enrollment[]
-  certificates Certificate[]
-  reviews      Review[]
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+// ====== EXAMS ======
+model Exam {
+  id              String   @id @default(cuid())
+  title           String   // "SSC CGL", "IBPS PO", "UPSC Prelims"
+  slug            String   @unique
+  description     String
+  icon            String?  // emoji or icon name
+  category        String   // "ssc", "banking", "upsc", "railway", "state"
+  duration        Int?     // exam duration in minutes
+  totalMarks      Float?
+  negativeMarking Float    @default(0.25) // marks deducted per wrong answer
+  status          String   @default("active") // "active" | "inactive"
+  price           Float    @default(0) // 0 = free
+  order           Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  subjects    Subject[]
+  mockTests   MockTest[]
+  enrollments Enrollment[]
 }
 
-model Chapter {
+// ====== SUBJECTS & TOPICS ======
+model Subject {
+  id        String   @id @default(cuid())
+  title     String   // "Quantitative Aptitude", "Reasoning", "General Knowledge"
+  slug      String
+  icon      String?
+  order     Int      @default(0)
+  examId    String
+  exam      Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  topics Topic[]
+
+  @@unique([examId, slug])
+}
+
+model Topic {
+  id        String   @id @default(cuid())
+  title     String   // "Percentage", "Profit & Loss", "Time & Work"
+  slug      String
+  order     Int      @default(0)
+  subjectId String
+  subject   Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  notes     StudyNote[]
+  questions Question[]
+
+  @@unique([subjectId, slug])
+}
+
+// ====== STUDY MATERIAL (Notes - no videos) ======
+model StudyNote {
   id        String   @id @default(cuid())
   title     String
-  order     Int
-  courseId  String
-  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  lessons   Lesson[]
-  createdAt DateTime @default(now())
-}
-
-model Lesson {
-  id        String           @id @default(cuid())
-  title     String
-  content   String
-  type      String           @default("text")
-  videoUrl  String?
-  duration  Int?
-  order     Int
-  chapterId String
-  chapter   Chapter          @relation(fields: [chapterId], references: [id], onDelete: Cascade)
-  quiz      Quiz?
-  progress  LessonProgress[]
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
-}
-
-model Quiz {
-  id        String         @id @default(cuid())
-  lessonId  String         @unique
-  lesson    Lesson         @relation(fields: [lessonId], references: [id], onDelete: Cascade)
-  questions QuizQuestion[]
-  attempts  QuizAttempt[]
-  createdAt DateTime       @default(now())
-}
-
-model QuizQuestion {
-  id            String  @id @default(cuid())
-  question      String
-  options       String
-  correctAnswer Int
-  explanation   String?
-  order         Int
-  quizId        String
-  quiz          Quiz    @relation(fields: [quizId], references: [id], onDelete: Cascade)
-}
-
-model QuizAttempt {
-  id        String   @id @default(cuid())
-  score     Float
-  answers   String
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  quizId    String
-  quiz      Quiz     @relation(fields: [quizId], references: [id])
-  createdAt DateTime @default(now())
-}
-
-model Enrollment {
-  id             String           @id @default(cuid())
-  userId         String
-  user           User             @relation(fields: [userId], references: [id])
-  courseId       String
-  course         Course           @relation(fields: [courseId], references: [id])
-  progress       Float            @default(0)
-  completedAt    DateTime?
-  lessonProgress LessonProgress[]
-  createdAt      DateTime         @default(now())
-
-  @@unique([userId, courseId])
-}
-
-model LessonProgress {
-  id           String     @id @default(cuid())
-  completed    Boolean    @default(false)
-  lessonId     String
-  lesson       Lesson     @relation(fields: [lessonId], references: [id])
-  enrollmentId String
-  enrollment   Enrollment @relation(fields: [enrollmentId], references: [id])
-  completedAt  DateTime?
-  createdAt    DateTime   @default(now())
-
-  @@unique([lessonId, enrollmentId])
-}
-
-model Certificate {
-  id            String   @id @default(cuid())
-  certificateNo String   @unique @default(cuid())
-  userId        String
-  user          User     @relation(fields: [userId], references: [id])
-  courseId       String
-  course        Course   @relation(fields: [courseId], references: [id])
-  completedAt   DateTime
-  issuedAt      DateTime @default(now())
-
-  @@unique([userId, courseId])
-}
-
-model Review {
-  id        String   @id @default(cuid())
-  rating    Int
-  comment   String?
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  courseId   String
-  course    Course   @relation(fields: [courseId], references: [id])
+  content   String   // HTML content - study notes
+  summary   String?  // Quick revision summary
+  keyPoints String?  // JSON array of key points
+  mnemonics String?  // Memory tricks
+  order     Int      @default(0)
+  topicId   String
+  topic     Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  @@unique([userId, courseId])
 }
 
+// ====== QUESTION BANK ======
+model Question {
+  id            String  @id @default(cuid())
+  question      String  // Question text (can include HTML)
+  options       String  // JSON array: ["option1", "option2", "option3", "option4"]
+  correctAnswer Int     // 0-3 index
+  explanation   String? // Detailed explanation
+  difficulty    String  @default("medium") // "easy" | "medium" | "hard"
+  marks         Float   @default(2)
+  topicId       String
+  topic         Topic   @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  createdAt     DateTime @default(now())
+
+  testQuestions TestQuestion[]
+}
+
+// ====== MOCK TESTS ======
+model MockTest {
+  id              String    @id @default(cuid())
+  title           String    // "SSC CGL Mock Test #1"
+  type            String    @default("full_length") // "full_length" | "sectional" | "topic_wise" | "daily_quiz"
+  duration        Int       // minutes
+  totalMarks      Float
+  negativeMarking Float     @default(0.25)
+  status          String    @default("draft") // "draft" | "published" | "archived"
+  isFree          Boolean   @default(false)
+  scheduledAt     DateTime? // for scheduled tests
+  examId          String
+  exam            Exam      @relation(fields: [examId], references: [id], onDelete: Cascade)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  sections TestSection[]
+  attempts TestAttempt[]
+}
+
+model TestSection {
+  id         String   @id @default(cuid())
+  title      String   // "Quantitative Aptitude", "Reasoning"
+  duration   Int?     // section-wise time limit (optional)
+  order      Int      @default(0)
+  mockTestId String
+  mockTest   MockTest @relation(fields: [mockTestId], references: [id], onDelete: Cascade)
+
+  questions TestQuestion[]
+}
+
+model TestQuestion {
+  id         String @id @default(cuid())
+  order      Int
+  sectionId  String
+  questionId String
+
+  section  TestSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  question Question    @relation(fields: [questionId], references: [id])
+}
+
+// ====== TEST ATTEMPTS & RESULTS ======
+model TestAttempt {
+  id            String   @id @default(cuid())
+  userId        String
+  mockTestId    String
+  answers       String   // JSON: {"questionId": selectedOption} (-1 = skipped)
+  score         Float
+  totalMarks    Float
+  correctCount  Int      @default(0)
+  wrongCount    Int      @default(0)
+  skippedCount  Int      @default(0)
+  timeTaken     Int      // seconds
+  sectionScores String?  // JSON: {"sectionId": {"score": x, "correct": y, "wrong": z}}
+  rank          Int?     // calculated after test ends
+  completedAt   DateTime @default(now())
+
+  user     User     @relation(fields: [userId], references: [id])
+  mockTest MockTest @relation(fields: [mockTestId], references: [id])
+}
+
+// ====== ENROLLMENT (Exam access) ======
+model Enrollment {
+  id        String   @id @default(cuid())
+  userId    String
+  examId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+  exam Exam @relation(fields: [examId], references: [id])
+
+  @@unique([userId, examId])
+}
+
+// ====== STUDY PROGRESS ======
+model StudyProgress {
+  id           String    @id @default(cuid())
+  userId       String
+  topicId      String
+  notesRead    Boolean   @default(false) // has read the notes
+  questionsAttempted Int @default(0)
+  questionsCorrect   Int @default(0)
+  lastStudiedAt      DateTime @default(now())
+  createdAt    DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, topicId])
+}
+
+// ====== BOOKMARKS ======
+model Bookmark {
+  id         String   @id @default(cuid())
+  userId     String
+  type       String   // "question" | "note"
+  resourceId String   // ID of question or note
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, type, resourceId])
+}
+
+// ====== PAYMENTS ======
+model Transaction {
+  id                String   @id @default(cuid())
+  userId            String
+  type              String   // "exam_purchase" | "subscription"
+  amount            Float
+  currency          String   @default("INR")
+  status            String   @default("pending") // "pending" | "completed" | "failed" | "refunded"
+  razorpayOrderId   String?
+  razorpayPaymentId String?
+  examId            String?
+  metadata          String?  // JSON
+  createdAt         DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+// ====== NOTIFICATIONS ======
 model Notification {
   id        String   @id @default(cuid())
-  type      String
+  type      String   // "new_test", "result", "announcement", "streak"
   title     String
   message   String
   read      Boolean  @default(false)
   userId    String
   user      User     @relation(fields: [userId], references: [id])
-  metadata  String?
+  metadata  String?  // JSON
+  createdAt DateTime @default(now())
+}
+
+// ====== ANNOUNCEMENTS (Admin → All students) ======
+model Announcement {
+  id        String   @id @default(cuid())
+  title     String
+  message   String
+  category  String?  // target exam category or "all"
+  active    Boolean  @default(true)
   createdAt DateTime @default(now())
 }
